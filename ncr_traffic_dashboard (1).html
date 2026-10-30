@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delhi NCR Interactive Traffic & Emissions Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #1a73e8;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .container {
+            display: flex;
+            flex-direction: row;
+            max-width: 1400px;
+            margin: 20px auto;
+            gap: 20px;
+            padding: 0 15px;
+        }
+        .sidebar {
+            flex: 1;
+            min-width: 320px;
+            max-width: 380px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+        .main-panel {
+            flex: 3;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+        .section-title {
+            font-size: 16px;
+            color: #1a73e8;
+            border-bottom: 2px solid #e8f0fe;
+            padding-bottom: 8px;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #5f6368;
+        }
+        select, input[type="number"], input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .range-val {
+            min-width: 45px;
+            font-weight: bold;
+            text-align: right;
+            font-size: 14px;
+        }
+        .btn-warning {
+            background-color: #f1f3f4;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        .btn-warning:hover {
+            background-color: #e8eaed;
+        }
+        .kpi-container {
+            display: flex;
+            gap: 15px;            margin-bottom: 25px;
+        }
+        .kpi-card {
+            flex: 1;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .kpi-blue {
+            background-color: #e8f0fe;
+            border: 1px solid #1a73e8;
+            color: #1a73e8;
+        }
+        .kpi-status {
+            background-color: #e6f4ea;
+            border: 1px solid #137333;
+            color: #137333;
+            font-weight: bold;
+        }
+        .kpi-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            margin-bottom: 25px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #5f6368;
+        }
+        .maps-grid {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 25px;
+        }
+        .map-box {
+            flex: 1;
+            min-width: 320px;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            padding: 10px;
+            background: white;
+            position: relative;
+        }
+        .map-box h4 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            font-size: 14px;
+            color: #3c4043;
+        }
+        .leaflet-map {
+            height: 380px;
+            width: 100%;
+            border-radius: 4px;
+        }
+        .junction-list {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+        .junction-list li {
+            margin-bottom: 6px;
+        }
+        /* Map Legend Styling */
+        .map-legend {
+            background: white;
+            padding: 8px 12px;
+            font-size: 12px;
+            line-height: 18px;
+            color: #555;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            font-family: inherit;
+        }
+        .map-legend i {
+            width: 18px;
+            height: 12px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.85;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Delhi NCR Interactive Traffic &amp; Emissions Dashboard</h1>
+    <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Real-time Calibration Engine</p>
+</header>
+
+<div class="container">
+    <div class="sidebar">
+        <div class="section-title">1. Simulation Scenario</div>
+        <div class="form-group">
+            <label for="viewToggle">TTI Perspective</label>
+            <select id="viewToggle">
+                <option value="Hourly View">Hourly View</option>
+                <option value="Daily Average View">Daily Average View</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="routeSelect">Corridor/Route</label>
+            <select id="routeSelect">
+                <option value="NH-48 / Gurugram-Delhi">NH-48 / Gurugram-Delhi</option>
+                <option value="Noida-Greater Noida Expwy">Noida-Greater Noida Expwy</option>
+                <option value="Dwarka Expressway">Dwarka Expressway</option>
+                <option value="Ring Rd / Aurobindo / Lodhi Rd">Ring Rd / Aurobindo / Lodhi Rd</option>
+                <option value="ITO / Vikas Marg / Ring Rd">ITO / Vikas Marg / Ring Rd</option>
+                <option value="Outer Ring Rd (South-West)">Outer Ring Rd (South-West)</option>
+                <option value="NH-24/NH-9 East corridor">NH-24/NH-9 East corridor</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="daySelect">Day of Week</label>
+            <select id="daySelect">
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="timeSelect">Time Period</label>
+            <select id="timeSelect">
+                <option value="Morning Peak (08:00 - 11:00)">Morning Peak (08:00 - 11:00)</option>
+                <option value="Afternoon Off-Peak (11:00 - 16:00)">Afternoon Off-Peak (11:00 - 16:00)</option>
+                <option value="Evening Peak (17:00 - 21:00)">Evening Peak (17:00 - 21:00)</option>
+                <option value="Night Off-Peak (21:00 - 08:00)">Night Off-Peak (21:00 - 08:00)</option>
+            </select>
+        </div>
+        <button class="btn-warning" onclick="resetScenario()">Reset Scenario</button>
+
+        <div class="section-title" style="margin-top:25px;">2. Modelling Scale Variables</div>
+        <div class="form-group">
+            <label for="demandSlider">Traffic Demand Scale</label>
+            <div class="range-container">
+                <input type="range" id="demandSlider" min="0.0" max="2.0" step="0.1" value="1.0" oninput="updateDemandVal(this.value)">
+                <span id="demandValDisplay" class="range-val">1.0</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="jnCapSlider">Junction Capacity (jn_cap)</label>
+            <div class="range-container">
+                <input type="range" id="jnCapSlider" min="0.5" max="2.0" step="0.01" value="1.12" oninput="updateJnCapVal(this.value)">
+                <span id="jnCapValDisplay" class="range-val">1.12</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="segAlphaSlider">Segment BPR (seg_alpha)</label>
+            <div class="range-container">
+                <input type="range" id="segAlphaSlider" min="0.0" max="1.0" step="0.01" value="0.22" oninput="updateSegAlphaVal(this.value)">
+                <span id="segAlphaValDisplay" class="range-val">0.22</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="jnAlphaSlider">Junction BPR (jn_alpha)</label>
+            <div class="range-container">
+                <input type="range" id="jnAlphaSlider" min="0.0" max="1.5" step="0.01" value="0.75" oninput="updateJnAlphaVal(this.value)">
+                <span id="jnAlphaValDisplay" class="range-val">0.75</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="evSlider">EV Penetration %</label>
+            <div class="range-container">
+                <input type="range" id="evSlider" min="0.0" max="100.0" step="1.0" value="10.0" oninput="updateEvVal(this.value)">
+                <span id="evValDisplay" class="range-val">10%</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="heavySlider">Heavy Vehicle %</label>
+            <div class="range-container">
+                <input type="range" id="heavySlider" min="0.0" max="30.0" step="1.0" value="5.0" oninput="updateHeavyVal(this.value)">
+                <span id="heavyValDisplay" class="range-val">5%</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="weatherSelect">Weather Condition</label>
+            <select id="weatherSelect">
+                <option value="Dry / Clear">Dry / Clear</option>
+                <option value="Rain">Rain</option>
+                <option value="Heavy Waterlogging">Heavy Waterlogging</option>
+            </select>
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+            <input type="checkbox" id="signalOpt" style="width:auto;">
+            <label for="signalOpt" style="display:inline; margin:0;">Enable Signal Retiming</label>
+        </div>
+        <button class="btn-warning" onclick="resetScale()">Reset Modelling</button>
+    </div>
+
+    <div class="main-panel">
+        <div class="section-title">Route Analytics &amp; Impact Estimates</div>
+
+        <div class="kpi-container">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-title">Travel Time Index (TTI)</div>
+                <div class="kpi-value" id="ttiDisplay">1.4100</div>
+            </div>
+            <div class="kpi-card kpi-status" id="statusCard">
+                <div class="kpi-title">Level of Service (LOS)</div>
+                <div class="kpi-value" id="statusDisplay" style="font-size:18px; margin-top:8px;">Normal (A/B)</div>
+            </div>
+        </div>
+
+        <div class="section-title">Tailpipe Emissions Profiler</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Pollutant Metric</th>
+                    <th style="text-align: right;">Estimated Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><b>CO2 (Carbon Dioxide)</b></td>
+                    <td id="co2Display" style="text-align: right; font-weight: bold;">150.0 g/km</td>
+                </tr>
+                <tr>
+                    <td><b>NOx (Nitrogen Oxides)</b></td>
+                    <td id="noxDisplay" style="text-align: right; font-weight: bold;">0.450 g/km</td>
+                </tr>
+                <tr>
+                    <td><b>PM2.5 (Particulate Matter)</b></td>
+                    <td id="pmDisplay" style="text-align: right; font-weight: bold;">0.030 g/km</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="section-title">Route Checkpoint Node Delays</div>
+        <ul id="junctionList" class="junction-list"></ul>
+
+        <div class="maps-grid">
+            <div class="map-box">
+                <h4>Baseline Map Layer (Standard)</h4>
+                <div id="mapBaseline" class="leaflet-map"></div>
+            </div>
+            <div class="map-box">
+                <h4>Custom Modeling Scenario Map</h4>
+                <div id="mapModeled" class="leaflet-map"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const routeGeometries = {
+        "NH-48 / Gurugram-Delhi": [
+            [28.4252, 77.0401], [28.4593, 77.0725], [28.5035, 77.0855], [28.5410, 77.1215], [28.5910, 77.1615]
+        ],
+        "Noida-Greater Noida Expwy": [
+            [28.5451, 77.3262], [28.5102, 77.3731], [28.4685, 77.4150], [28.3752, 77.5361]
+        ],
+        "Dwarka Expressway": [
+            [28.4111, 76.9952], [28.4552, 76.9855], [28.5121, 77.0210], [28.5582, 77.0601]
+        ],
+        "Ring Rd / Aurobindo / Lodhi Rd": [
+            [28.5672, 77.2100], [28.5750, 77.2210], [28.5882, 77.2285], [28.5905, 77.2452]
+        ],
+        "ITO / Vikas Marg / Ring Rd": [
+            [28.6252, 77.2441], [28.6310, 77.2625], [28.6355, 77.2882], [28.6410, 77.3120]
+        ],
+        "Outer Ring Rd (South-West)": [
+            [28.5552, 77.1625], [28.5621, 77.1895], [28.5655, 77.2230], [28.5510, 77.2510]
+        ],
+        "NH-24/NH-9 East corridor": [
+            [28.6185, 77.2801], [28.6221, 77.3210], [28.6272, 77.3622], [28.6310, 77.4201]
+        ]
+    };
+
+    const junctionsMap = {
+        "NH-48 / Gurugram-Delhi": ["Sirhaul Border", "Rajiv Chowk", "Iffco Chowk"],
+        "Noida-Greater Noida Expwy": ["Mahamaya Flyover", "Sector 37", "Pari Chowk"],
+        "Dwarka Expressway": ["Sector 21 Crossing", "Bajghera Flyover", "Kherki Daula Link"],
+        "Ring Rd / Aurobindo / Lodhi Rd": ["Moolchand", "AIIMS Crossing", "Safdarjung"],
+        "ITO / Vikas Marg / Ring Rd": ["ITO Crossing", "Laxmi Nagar", "Vikas Marg Junction"],
+        "Outer Ring Rd (South-West)": ["Munirka", "IIT Flyover", "RTR Flyover"],
+        "NH-24/NH-9 East corridor": ["Akshardham Temple", "Indirapuram Exit", "Ghazipur Border"]
+    };
+
+    // Create maps
+    const mapB = L.map('mapBaseline').setView([28.55, 77.20], 11);
+    const mapM = L.map('mapModeled').setView([28.55, 77.20], 11);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: 'Map data &copy; OpenStreetMap contributors'
+    }).addTo(mapB);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: 'Map data &copy; OpenStreetMap contributors'
+    }).addTo(mapM);
+
+    // Add legends dynamically to maps
+    function addLegendToMap(mapInstance) {
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'map-legend');
+            div.innerHTML = `
+                <b>Level of Service</b><br>
+                <i style="background:#137333"></i> TTI &lt; 1.30 (Normal)<br>
+                <i style="background:#e67e22"></i> 1.30 - 1.80 (Moderate)<br>
+                <i style="background:#d35400"></i> TTI &ge; 1.80 (Severe)
+            `;
+            return div;
+        };
+        legend.addTo(mapInstance);
+    }
+
+    addLegendToMap(mapB);
+    addLegendToMap(mapM);
+
+    let layersB = {};
+    let layersM = {};
+
+    function updateDemandVal(v) { document.getElementById('demandValDisplay').innerText = v; recalculate(); }
+    function updateJnCapVal(v) { document.getElementById('jnCapValDisplay').innerText = v; recalculate(); }
+    function updateSegAlphaVal(v) { document.getElementById('segAlphaValDisplay').innerText = v; recalculate(); }
+    function updateJnAlphaVal(v) { document.getElementById('jnAlphaValDisplay').innerText = v; recalculate(); }
+    function updateEvVal(v) { document.getElementById('evValDisplay').innerText = v + '%'; recalculate(); }
+    function updateHeavyVal(v) { document.getElementById('heavyValDisplay').innerText = v + '%'; recalculate(); }
+
+    function getGeoColor(tti) {
+        if (tti < 1.3) return '#137333'; // Green
+        if (tti < 1.8) return '#e67e22'; // Orange
+        return '#d35400'; // Red
+    }
+
+    function recalculate() {
+        const route = document.getElementById('routeSelect').value;
+        const day = document.getElementById('daySelect').value;
+        const time = document.getElementById('timeSelect').value;
+        const view = document.getElementById('viewToggle').value;
+
+        const demand = parseFloat(document.getElementById('demandSlider').value);
+        const jnCap = parseFloat(document.getElementById('jnCapSlider').value);
+        const segAlpha = parseFloat(document.getElementById('segAlphaSlider').value);
+        const jnAlpha = parseFloat(document.getElementById('jnAlphaSlider').value);
+        const ev = parseFloat(document.getElementById('evSlider').value);
+        const heavy = parseFloat(document.getElementById('heavySlider').value);
+        const weather = document.getElementById('weatherSelect').value;
+        const optActive = document.getElementById('signalOpt').checked;
+
+        const routeFactor = {
+            "NH-48 / Gurugram-Delhi": 1.2,
+            "Noida-Greater Noida Expwy": 1.15,
+            "Dwarka Expressway": 0.95,
+            "Ring Rd / Aurobindo / Lodhi Rd": 1.3,
+            "ITO / Vikas Marg / Ring Rd": 1.4,
+            "Outer Ring Rd (South-West)": 1.1,
+            "NH-24/NH-9 East corridor": 1.25
+        }[route] || 1.0;
+
+        const dayFactor = (day === "Saturday" || day === "Sunday") ? 0.85 : 1.0;
+
+        let timeFactor = 1.0;
+        if (view === 'Daily Average View') {
+            timeFactor = 1.12;
+        } else {
+            timeFactor = {
+                "Morning Peak (08:00 - 11:00)": 1.35,
+                "Afternoon Off-Peak (11:00 - 16:00)": 1.0,
+                "Evening Peak (17:00 - 21:00)": 1.45,
+                "Night Off-Peak (21:00 - 08:00)": 0.7
+            }[time] || 1.0;
+        }
+
+        const weatherMult = {
+            "Dry / Clear": 1.0,
+            "Rain": 1.25,
+            "Heavy Waterlogging": 1.75
+        }[weather] || 1.0;
+
+        const structuralMultiplier = (segAlpha / 0.22) * 0.4 + (jnAlpha / (0.75 * (jnCap > 0 ? jnCap : 1.0))) * 0.6;
+        const hvMult = 1.0 + (heavy / 100.0) * 1.5;
+
+        const baseTti = 1.41;
+        let simulatedTti = baseTti * demand * routeFactor * dayFactor * timeFactor * weatherMult * hvMult * structuralMultiplier;
+        if (optActive) simulatedTti *= 0.94;
+
+        document.getElementById('ttiDisplay').innerText = simulatedTti.toFixed(4);
+
+        let status, color, bgColor, baseWait;
+        if (simulatedTti < 1.3) {
+            status = "Normal (A/B) - Smooth Traffic Flow";
+            color = "#137333";
+            bgColor = "#e6f4ea";
+            baseWait = 30.0;
+        } else if (simulatedTti < 1.8) {
+            status = "Moderate Congestion (C/D) - Minor Delays";
+            color = "#b06000";
+            bgColor = "#fef7e0";
+            baseWait = 90.0;
+        } else {
+            status = "Severe Congestion / Gridlock (E/F) - Heavy Delays";
+            color = "#c5221f";
+            bgColor = "#fce8e6";
+            baseWait = 240.0;
+        }
+
+        if (optActive) baseWait *= 0.85;
+
+        const statusCard = document.getElementById('statusCard');
+        statusCard.style.backgroundColor = bgColor;
+        statusCard.style.borderColor = color;
+        statusCard.style.color = color;
+        document.getElementById('statusDisplay').innerText = status;
+
+        const tailpipeReduct = 1.0 - (ev / 100.0);
+        const congestionMultiplier = 1.0 + (simulatedTti - 1.0) * 0.8;
+        const co2Base = 150.0 * (1.0 + (heavy / 100.0) * 2.0);
+        const noxBase = 0.45 * (1.0 + (heavy / 100.0) * 4.0);
+        const pmBase = 0.03 * (1.0 + (heavy / 100.0) * 5.0);
+
+        document.getElementById('co2Display').innerText = (co2Base * congestionMultiplier * tailpipeReduct).toFixed(1) + " g/km";
+        document.getElementById('co2Display').style.color = color;
+        document.getElementById('noxDisplay').innerText = (noxBase * congestionMultiplier * tailpipeReduct).toFixed(3) + " g/km";
+        document.getElementById('noxDisplay').style.color = color;
+        document.getElementById('pmDisplay').innerText = (pmBase * congestionMultiplier * tailpipeReduct).toFixed(3) + " g/km";
+        document.getElementById('pmDisplay').style.color = color;
+
+        const jnList = document.getElementById('junctionList');
+        jnList.innerHTML = "";
+        const junctions = junctionsMap[route] || [];
+        junctions.forEach((jn, idx) => {
+            const varFactor = [1.0, 1.2, 0.8][idx % 3];
+            const jnWait = baseWait * varFactor;
+            const li = document.createElement('li');
+            li.style.color = color;
+            li.innerHTML = `<span><b>${jn}:</b></span> ~${Math.round(jnWait)} seconds (${(jnWait/60).toFixed(1)} minutes delay)`;
+            jnList.appendChild(li);
+        });
+
+        // CLEAR PREVIOUS LAYERS TO FORCE RE-RENDERING
+        for (let r in layersB) { if(layersB[r]) mapB.removeLayer(layersB[r]); }
+        for (let r in layersM) { if(layersM[r]) mapM.removeLayer(layersM[r]); }
+        layersB = {};
+        layersM = {};
+
+        // DRAW THE UPDATED ROUTE GEOMETRIES
+        for (let r in routeGeometries) {
+            const coords = routeGeometries[r];
+            const isSel = (r === route);
+            const thickness = isSel ? 7 : 4;
+            const opac = isSel ? 0.95 : 0.65;
+
+            // Map 1: Baseline TTI
+            const routeBaseTti = 1.30 * dayFactor * (view === 'Daily Average View' ? 1.12 : (time === 'Morning Peak (08:00 - 11:00)' || time === 'Evening Peak (17:00 - 21:00)' ? 1.35 : 1.0));
+            const polyB = L.polyline(coords, {
+                color: getGeoColor(routeBaseTti),
+                weight: thickness,
+                opacity: opac
+            }).addTo(mapB);
+            polyB.bindPopup(`<b>${r}</b><br>Baseline TTI: ${routeBaseTti.toFixed(2)}`);
+            layersB[r] = polyB;
+
+            // Map 2: Simulated Calibration
+            let routeModTti = routeBaseTti * demand * weatherMult * structuralMultiplier * hvMult;
+            if (optActive) routeModTti *= 0.92;
+            const polyM = L.polyline(coords, {
+                color: getGeoColor(routeModTti),
+                weight: thickness,
+                opacity: opac
+            }).addTo(mapM);
+            polyM.bindPopup(`<b>${r}</b><br>Simulated TTI: ${routeModTti.toFixed(2)}`);
+            layersM[r] = polyM;
+        }
+    }
+
+    function resetScenario() {
+        document.getElementById('routeSelect').value = "NH-48 / Gurugram-Delhi";
+        document.getElementById('daySelect').value = "Monday";
+        document.getElementById('timeSelect').value = "Morning Peak (08:00 - 11:00)";
+        document.getElementById('viewToggle').value = "Hourly View";
+        recalculate();
+    }
+
+    function resetScale() {
+        document.getElementById('demandSlider').value = 1.0;
+        document.getElementById('jnCapSlider').value = 1.12;
+        document.getElementById('segAlphaSlider').value = 0.22;
+        document.getElementById('jnAlphaSlider').value = 0.75;
+        document.getElementById('evSlider').value = 10.0;
+        document.getElementById('heavySlider').value = 5.0;
+        document.getElementById('weatherSelect').value = "Dry / Clear";
+        document.getElementById('signalOpt').checked = false;
+
+        updateDemandVal(1.0);
+        updateJnCapVal(1.12);
+        updateSegAlphaVal(0.22);
+        updateJnAlphaVal(0.75);
+        updateEvVal(10.0);
+        updateHeavyVal(5.0);
+    }
+
+    // Hook event listeners to triggers
+    document.getElementById('routeSelect').addEventListener('change', recalculate);
+    document.getElementById('daySelect').addEventListener('change', recalculate);
+    document.getElementById('timeSelect').addEventListener('change', recalculate);
+    document.getElementById('viewToggle').addEventListener('change', recalculate);
+    document.getElementById('weatherSelect').addEventListener('change', recalculate);
+    document.getElementById('signalOpt').addEventListener('change', recalculate);
+
+    // Initialize on page load
+    recalculate();
+</script>
+
+</body>
+</html>
